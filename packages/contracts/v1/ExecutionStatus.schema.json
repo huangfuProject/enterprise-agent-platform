@@ -1,0 +1,182 @@
+{
+  "$defs": {
+    "AgentResult": {
+      "additionalProperties": false,
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "specialist": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Summary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "specialist_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Specialist Error"
+        },
+        "answer": {
+          "maxLength": 8000,
+          "minLength": 1,
+          "title": "Answer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "summary",
+        "specialist",
+        "answer"
+      ],
+      "title": "AgentResult",
+      "type": "object"
+    },
+    "Status": {
+      "enum": [
+        "ACCEPTED",
+        "RUNNING",
+        "SUCCEEDED",
+        "FAILED",
+        "CANCELLED"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "total": {
+          "title": "Total",
+          "type": "number"
+        },
+        "mean": {
+          "title": "Mean",
+          "type": "number"
+        }
+      },
+      "required": [
+        "count",
+        "total",
+        "mean"
+      ],
+      "title": "Summary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "v1",
+      "default": "v1",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "execution_id": {
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "checkpoint_thread_id": {
+      "title": "Checkpoint Thread Id",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/Status"
+    },
+    "started_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Started At"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "error_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error Code"
+    },
+    "error_message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error Message"
+    },
+    "result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AgentResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "checkpoint_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checkpoint Id"
+    }
+  },
+  "required": [
+    "task_id",
+    "execution_id",
+    "checkpoint_thread_id",
+    "status",
+    "updated_at"
+  ],
+  "title": "ExecutionStatus",
+  "type": "object"
+}

@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_steps": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Steps",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 120,
+          "maximum": 300,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "Limits",
+      "type": "object"
+    },
+    "TaskInput": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "TaskInput",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "idempotency_key": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "input": {
+      "$ref": "#/$defs/TaskInput"
+    },
+    "limits": {
+      "$ref": "#/$defs/Limits"
+    }
+  },
+  "required": [
+    "idempotency_key",
+    "input",
+    "limits"
+  ],
+  "title": "CreateTask",
+  "type": "object"
+}

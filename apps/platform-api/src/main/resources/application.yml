@@ -1,0 +1,34 @@
+# 默认仅绑定本机；此 PoC 没有生产身份认证和服务间授权。
+server:
+  address: ${API_BIND_ADDRESS:127.0.0.1}
+  port: ${API_PORT:8080}
+spring:
+  # 数据库连接与读取有界；密码只由环境注入，不在受版本控制的配置中保存。
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DB:eap_p0}?connectTimeout=5&socketTimeout=10
+    username: ${POSTGRES_USER:eap_p0}
+    password: ${POSTGRES_PASSWORD}
+    hikari:
+      connection-timeout: 5000
+      maximum-pool-size: 8
+  # 与 Python v1 Schema 保持字段命名一致，并拒绝不认识的输入字段。
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    deserialization:
+      fail-on-unknown-properties: true
+      fail-on-null-for-primitives: true
+  # 已执行迁移是历史事实，后续 Schema 变化应追加版本而不是编辑旧文件。
+  flyway:
+    enabled: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+# HTTP 时限是单次通信边界，lease 是控制平面失联边界，二者不能当作 Agent 完成状态。
+p0:
+  runtime-url: ${RUNTIME_URL:http://127.0.0.1:8000}
+  lease-seconds: ${LEASE_SECONDS:15}
+  dispatch-ms: ${DISPATCH_MS:500}
+  http-timeout-ms: ${RUNTIME_HTTP_TIMEOUT_MS:2000}
+  scheduler-enabled: ${SCHEDULER_ENABLED:true}

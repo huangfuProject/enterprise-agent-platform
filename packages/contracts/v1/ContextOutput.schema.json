@@ -1,0 +1,24 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "execution_id": {
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "purpose": {
+      "title": "Purpose",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "execution_id",
+    "purpose"
+  ],
+  "title": "ContextOutput",
+  "type": "object"
+}

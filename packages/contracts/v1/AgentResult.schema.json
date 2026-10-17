@@ -1,0 +1,71 @@
+{
+  "$defs": {
+    "Summary": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "total": {
+          "title": "Total",
+          "type": "number"
+        },
+        "mean": {
+          "title": "Mean",
+          "type": "number"
+        }
+      },
+      "required": [
+        "count",
+        "total",
+        "mean"
+      ],
+      "title": "Summary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "summary": {
+      "$ref": "#/$defs/Summary"
+    },
+    "specialist": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Summary"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "specialist_error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Specialist Error"
+    },
+    "answer": {
+      "maxLength": 8000,
+      "minLength": 1,
+      "title": "Answer",
+      "type": "string"
+    }
+  },
+  "required": [
+    "summary",
+    "specialist",
+    "answer"
+  ],
+  "title": "AgentResult",
+  "type": "object"
+}

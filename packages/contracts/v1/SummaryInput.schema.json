@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "values": {
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 100,
+      "minItems": 1,
+      "title": "Values",
+      "type": "array"
+    }
+  },
+  "required": [
+    "values"
+  ],
+  "title": "SummaryInput",
+  "type": "object"
+}

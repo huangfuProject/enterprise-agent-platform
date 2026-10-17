@@ -1,0 +1,57 @@
+# Operating system and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.local.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials.json
+service-account*.json
+secrets/
+.secrets/
+
+# Local development instructions and tool state
+AGENTS.md
+AGENTS.*.md
+CLAUDE.md
+GEMINI.md
+.codex/
+.claude/
+.cursor/
+.copilot/
+.aider*
+
+# Build artifacts and runtime state
+.venv/
+venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/*.egg-info/
+**/target/
+**/node_modules/
+**/dist/
+.data/
+*.db*
+*.log
+
+# Internal plans, working records and environment-specific evidence stay local.
+# Publish only the maintained API, ADR and implementation reference documents.
+/docs/*
+!/docs/api/
+!/docs/adr/
+!/docs/p0/
+/docs/p0/*
+!/docs/p0/architecture.md
+!/docs/p0/known-limitations.md
