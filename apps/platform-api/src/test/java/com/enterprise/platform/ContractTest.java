@@ -9,9 +9,15 @@ import java.nio.file.*;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** Java 协议编码测试；生成夹具供 Python 集成测试做真实交叉校验。 */
+/**
+ * Java 协议编码测试；生成夹具供 Python 集成测试做真实交叉校验。
+ *
+ * @author chomy
+ **/
 class ContractTest {
-  /** 验证 snake_case 和版本字段，确保 isFinite 校验辅助方法不会泄漏成协议属性。 */
+  /**
+   * 验证 snake_case 和版本字段，确保 isFinite 校验辅助方法不会泄漏成协议属性。
+   **/
   @Test
   void emitsVersionedRequestWithoutBeanHelperProperties() throws Exception {
     var request =

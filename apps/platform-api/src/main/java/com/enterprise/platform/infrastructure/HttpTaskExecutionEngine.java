@@ -13,7 +13,9 @@ import org.springframework.stereotype.Component;
  * TaskExecutionEngine 的 HTTP v1 适配器。
  *
  * <p>连接与请求均有界；传输失败表示执行结果未知，由 Dispatcher 后续查询，不能直接新建 Run。
- */
+ *
+ * @author chomy
+ **/
 @Component
 public class HttpTaskExecutionEngine implements TaskExecutionEngine {
   private final HttpClient client;
@@ -21,7 +23,9 @@ public class HttpTaskExecutionEngine implements TaskExecutionEngine {
   private final String base;
   private final Duration timeout;
 
-  /** 配置有界 HTTP 客户端；HTTP/1.1 避免对当前 Uvicorn 发送不必要的 h2c 升级请求。 */
+  /**
+   * 配置有界 HTTP 客户端；HTTP/1.1 避免对当前 Uvicorn 发送不必要的 h2c 升级请求。
+   **/
   public HttpTaskExecutionEngine(
       ObjectMapper json,
       @Value("${p0.runtime-url}") String base,
@@ -40,7 +44,7 @@ public class HttpTaskExecutionEngine implements TaskExecutionEngine {
    * 发送一次有界 HTTP JSON 请求并映射安全传输错误。
    *
    * <p>不做隐式重试；结果未知时交由 Dispatcher 使用原执行身份继续查询。
-   */
+   **/
   private JsonNode call(String path, String method, Object body) {
     try {
       var builder =
@@ -71,7 +75,9 @@ public class HttpTaskExecutionEngine implements TaskExecutionEngine {
     }
   }
 
-  /** 将内部 TaskRecord 投影为独立 RuntimeRequest 并校验，禁止内部状态结构泄漏到协议。 */
+  /**
+   * 将内部 TaskRecord 投影为独立 RuntimeRequest 并校验，禁止内部状态结构泄漏到协议。
+   **/
   @Override
   public void submit(TaskRecord t) {
     try {
@@ -97,19 +103,25 @@ public class HttpTaskExecutionEngine implements TaskExecutionEngine {
     }
   }
 
-  /** 获取当前执行快照；返回的是 Runtime 状态，不直接修改 Java Task。 */
+  /**
+   * 获取当前执行快照；返回的是 Runtime 状态，不直接修改 Java Task。
+   **/
   @Override
   public JsonNode getStatus(String id) {
     return call("/internal/v1/executions/" + id, "GET", null);
   }
 
-  /** 从最后已导入游标读取运行内增量事件；业务序号由 Repository 重新分配。 */
+  /**
+   * 从最后已导入游标读取运行内增量事件；业务序号由 Repository 重新分配。
+   **/
   @Override
   public JsonNode getEvents(String id, long after) {
     return call("/internal/v1/executions/" + id + "/events?after=" + after, "GET", null);
   }
 
-  /** 向 Runtime 提交幂等取消意图；具体进程终止由 Runtime 监督。 */
+  /**
+   * 向 Runtime 提交幂等取消意图；具体进程终止由 Runtime 监督。
+   **/
   @Override
   public void cancel(String id) {
     call("/internal/v1/executions/" + id + "/cancel", "POST", null);

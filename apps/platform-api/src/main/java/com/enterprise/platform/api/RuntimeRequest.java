@@ -18,7 +18,9 @@ import jakarta.validation.constraints.*;
  * @param agentDefinition 已注册的主 Agent 模板，P0 仅支持 main-agent
  * @param input 有限的任务消息和样例数据
  * @param limits 共享步骤预算与总执行时限
- */
+ *
+ * @author chomy
+ **/
 public record RuntimeRequest(
     @NotNull @Pattern(regexp = "v1") String contractVersion,
     @NotNull @Pattern(regexp = "[A-Za-z0-9_-]{1,80}") String taskId,

@@ -19,7 +19,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 每个 Task 只有一次 Run。
  *
  * <p>依靠 Task 行锁协调竞态、唯一约束执行幂等、fence 拒绝旧持有者回写；不承诺 exactly-once。
- */
+ *
+ * @author chomy
+ **/
 @Repository
 public class TaskRepository {
   private final JdbcTemplate jdbc;
@@ -35,7 +37,9 @@ public class TaskRepository {
         FROM p0_task t JOIN p0_run r ON r.task_id=t.task_id
         """;
 
-  /** 注入数据库事务、JSON 编码器和租约时长；租约期限一律按数据库时钟计算。 */
+  /**
+   * 注入数据库事务、JSON 编码器和租约时长；租约期限一律按数据库时钟计算。
+   **/
   public TaskRepository(
       JdbcTemplate jdbc,
       TransactionTemplate tx,
@@ -47,7 +51,9 @@ public class TaskRepository {
     this.leaseSeconds = leaseSeconds;
   }
 
-  /** 还原持久化 JSON；损坏数据必须显式失败，不用空结果掩盖。 */
+  /**
+   * 还原持久化 JSON；损坏数据必须显式失败，不用空结果掩盖。
+   **/
   private JsonNode parse(String value) {
     if (value == null) return null;
     try {
@@ -57,13 +63,17 @@ public class TaskRepository {
     }
   }
 
-  /** 将可空数据库时间戳映射为绝对时间，不用应用默认时区猜测含义。 */
+  /**
+   * 将可空数据库时间戳映射为绝对时间，不用应用默认时区猜测含义。
+   **/
   private Instant instant(ResultSet rs, String key) throws SQLException {
     var value = rs.getTimestamp(key);
     return value == null ? null : value.toInstant();
   }
 
-  /** 联合映射 Task 和 Run；保留业务状态、执行状态、心跳与 Checkpoint 的职责区别。 */
+  /**
+   * 联合映射 Task 和 Run；保留业务状态、执行状态、心跳与 Checkpoint 的职责区别。
+   **/
   private TaskRecord row(ResultSet rs, int number) throws SQLException {
     return new TaskRecord(
         rs.getString("task_id"),
@@ -87,7 +97,9 @@ public class TaskRepository {
         rs.getLong("runtime_event_cursor"));
   }
 
-  /** 使用统一 Jackson 配置编码数据库 JSONB 和事件载荷。 */
+  /**
+   * 使用统一 Jackson 配置编码数据库 JSONB 和事件载荷。
+   **/
   private String encode(Object value) {
     try {
       return json.writeValueAsString(value);
@@ -96,7 +108,9 @@ public class TaskRepository {
     }
   }
 
-  /** 查询任务/运行快照；只读取现有记录，不创建 Run 或触发网络访问。 */
+  /**
+   * 查询任务/运行快照；只读取现有记录，不创建 Run 或触发网络访问。
+   **/
   public TaskRecord get(String id) {
     var rows = jdbc.query(SELECT + " WHERE t.task_id=?", this::row, id);
     if (rows.isEmpty()) throw new TaskException(404, "TASK_NOT_FOUND");
@@ -107,7 +121,7 @@ public class TaskRepository {
    * 在当前事务取得 Task 行锁后读取最新快照。
    *
    * <p>调用方必须在 TransactionTemplate 中使用；该锁串行化取消、完成和事件追加。
-   */
+   **/
   private TaskRecord lock(String id) {
     jdbc.queryForObject("SELECT task_id FROM p0_task WHERE task_id=? FOR UPDATE", String.class, id);
     return get(id);
@@ -121,7 +135,7 @@ public class TaskRepository {
    * @param trace 首次创建请求的关联标识
    * @return 新任务或同键同载荷的已存在任务
    * @throws TaskException 相同幂等键绑定不同指纹时拒绝
-   */
+   **/
   public TaskRecord create(CreateTask body, String hash, String trace) {
     return tx.execute(
         status -> {
@@ -168,7 +182,7 @@ public class TaskRepository {
    *
    * <p>调用方须持有任务行锁，或处于该任务首次创建的独占事务；否则 max(sequence)+1 本身不能提供并发安全。Runtime 的 sequence 保留在
    * payload，顶层为业务序号。
-   */
+   **/
   private void append(TaskRecord task, String type, Object payload) {
     jdbc.update(
         """
@@ -186,7 +200,7 @@ public class TaskRepository {
    * 校验合法迁移，更新 Task 状态/版本并在同一事务追加业务事件。
    *
    * <p>当前实现依靠行锁串行化；version 用于追踪变更，不是另一个未经实现的 CAS 协议。
-   */
+   **/
   private void transition(TaskRecord task, TaskState target) {
     if (task.state() == target) return;
     if (!task.state().allows(target)) throw new IllegalStateException("INVALID_STATE_TRANSITION");
@@ -202,8 +216,8 @@ public class TaskRepository {
    *
    * @param owner 本次调度器实例标识
    * @return 领取后的最新快照；无可领取记录时为空
-   *     <p>SKIP LOCKED 让其他 Worker 跳过已锁任务；事务提交前不能发起 Runtime HTTP 调用。
-   */
+   * <p>SKIP LOCKED 让其他 Worker 跳过已锁任务；事务提交前不能发起 Runtime HTTP 调用。
+   **/
   public Optional<TaskRecord> claim(String owner) {
     return tx.execute(
         status -> {
@@ -229,7 +243,9 @@ public class TaskRepository {
         });
   }
 
-  /** 读取本实例仍持有有效租约的最多四个活动任务，过期执行不能继续正常续租。 */
+  /**
+   * 读取本实例仍持有有效租约的最多四个活动任务，过期执行不能继续正常续租。
+   **/
   public List<TaskRecord> owned(String owner) {
     return jdbc.query(
         SELECT
@@ -243,7 +259,7 @@ public class TaskRepository {
    * 在任务行锁内记录取消意图，与完成事务竞争。
    *
    * <p>QUEUED 尚未投递，可直接取消；已领取/运行的任务先进入 CANCEL_REQUESTED。 已有终态和重复取消保持幂等，实际停止由 Runtime 处理。
-   */
+   **/
   public TaskRecord cancel(String id) {
     return tx.execute(
         status -> {
@@ -263,7 +279,7 @@ public class TaskRepository {
    * 失败关闭过期执行并提高 fence，不自动重新排队或重放。
    *
    * <p>已有取消意图时业务状态收敛为 CANCELLED；其他情况为 FAILED/WORKER_LOST。
-   */
+   **/
   public void expireLeases() {
     tx.executeWithoutResult(
         status -> {
@@ -296,8 +312,8 @@ public class TaskRepository {
    * @param claimed 发起查询时持有的 owner/fence 快照
    * @param snapshot Runtime 回传的执行快照，先校验 Task/Run 绑定
    * @param events 按运行内 sequence 排序的增量事件
-   *     <p>重新校验租约可阻止查询期间失效的旧 Worker 覆盖结果。取消先提交时，不发布迟到成功。
-   */
+   * <p>重新校验租约可阻止查询期间失效的旧 Worker 覆盖结果。取消先提交时，不发布迟到成功。
+   **/
   public void reconcile(TaskRecord claimed, JsonNode snapshot, JsonNode events) {
     tx.executeWithoutResult(
         status -> {
@@ -366,13 +382,17 @@ public class TaskRepository {
         });
   }
 
-  /** 读取可空 JSON 文本字段；保留 SQL NULL，避免把字符串 null 写入数据库。 */
+  /**
+   * 读取可空 JSON 文本字段；保留 SQL NULL，避免把字符串 null 写入数据库。
+   **/
   private String text(JsonNode node, String key) {
     var value = node.get(key);
     return value == null || value.isNull() ? null : value.asText();
   }
 
-  /** 查询任务内序号大于 after 的最多500条事件，并补齐统一关联标识。 */
+  /**
+   * 查询任务内序号大于 after 的最多500条事件，并补齐统一关联标识。
+   **/
   public List<Map<String, Object>> events(String id, long after) {
     var task = get(id);
     return jdbc.query(

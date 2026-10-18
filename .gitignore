@@ -1,6 +1,7 @@
 # Operating system and editor files
 .DS_Store
 .idea/
+*.iml
 .vscode/
 *.swp
 *.swo

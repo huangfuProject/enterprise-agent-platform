@@ -12,10 +12,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * 为每次公共 HTTP 请求建立可关联的 trace_id。
  *
  * <p>限制外部标识字符和长度，避免日志注入；线程结束时必须清理 MDC，防止线程池复用串号。
- */
+ *
+ * @author chomy
+ **/
 @Component
 public class TraceFilter extends OncePerRequestFilter {
-  /** 校验或生成 trace，写入请求、响应和 MDC，并在 finally 中清理线程上下文。 */
+  /**
+   * 校验或生成 trace，写入请求、响应和 MDC，并在 finally 中清理线程上下文。
+   **/
   @Override
   protected void doFilterInternal(
       HttpServletRequest req, HttpServletResponse res, FilterChain chain)

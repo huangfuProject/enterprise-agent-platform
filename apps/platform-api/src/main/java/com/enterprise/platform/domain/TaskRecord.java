@@ -25,7 +25,9 @@ import java.time.Instant;
  * @param result 经 Runtime 校验的结构化结果，可为空
  * @param checkpointId 最终可关联的图快照标识，可为空
  * @param runtimeEventCursor 已导入 Java 的 Runtime 事件序号
- */
+ *
+ * @author chomy
+ **/
 public record TaskRecord(
     String taskId,
     String executionId,

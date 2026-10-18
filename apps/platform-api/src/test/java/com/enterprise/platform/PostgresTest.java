@@ -15,7 +15,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** 真实 PostgreSQL 集成测试；显式开关启用，关闭调度器避免后台消费测试队列。 */
+/**
+ * 真实 PostgreSQL 集成测试；显式开关启用，关闭调度器避免后台消费测试队列。
+ *
+ * @author chomy
+ **/
 @SpringBootTest(properties = {"p0.scheduler-enabled=false", "p0.lease-seconds=15"})
 @EnabledIfEnvironmentVariable(named = "RUN_DB_TESTS", matches = "true")
 class PostgresTest {
@@ -24,17 +28,23 @@ class PostgresTest {
   @Autowired JdbcTemplate jdbc;
   @Autowired ObjectMapper json;
 
-  /** 构造有限测试载荷；调用方提供独立幂等键。 */
+  /**
+   * 构造有限测试载荷；调用方提供独立幂等键。
+   **/
   CreateTask body(String key) {
     return new CreateTask(key, new Input("analyze", List.of(1d, 2d, 3d)), new Limits(20, 120));
   }
 
-  /** 使用随机请求键创建测试任务，不复用已有业务键。 */
+  /**
+   * 使用随机请求键创建测试任务，不复用已有业务键。
+   **/
   TaskRecord create() {
     return service.create(body(UUID.randomUUID().toString()), "db-test");
   }
 
-  /** 同键同载荷返回相同 Task/Run，同键异载荷必须409；改变 trace 不能绕过幂等。 */
+  /**
+   * 同键同载荷返回相同 Task/Run，同键异载荷必须409；改变 trace 不能绕过幂等。
+   **/
   @Test
   void idempotencyAndConflict() {
     var input = body(UUID.randomUUID().toString());
@@ -50,7 +60,9 @@ class PostgresTest {
     repository.cancel(first.taskId());
   }
 
-  /** 同时释放8个领取线程，断言指定任务只有一个获胜者；不是用顺序执行模拟竞争。 */
+  /**
+   * 同时释放8个领取线程，断言指定任务只有一个获胜者；不是用顺序执行模拟竞争。
+   **/
   @Test
   void concurrentClaimIsAtomic() throws Exception {
     var task = create();
@@ -80,7 +92,9 @@ class PostgresTest {
     repository.expireLeases();
   }
 
-  /** 只使本测试任务租约过期，再模拟旧持有者迟到成功；终态和 fence 必须保持有效。 */
+  /**
+   * 只使本测试任务租约过期，再模拟旧持有者迟到成功；终态和 fence 必须保持有效。
+   **/
   @Test
   void leaseExpiryFencesStaleWorker() {
     var task = create();
@@ -101,7 +115,9 @@ class PostgresTest {
     assertThat(repository.get(task.taskId()).fence()).isGreaterThan(claimed.fence());
   }
 
-  /** 同时提交取消/完成，允许任一事务先赢，但最终必须只有一个一致业务终态事件。 */
+  /**
+   * 同时提交取消/完成，允许任一事务先赢，但最终必须只有一个一致业务终态事件。
+   **/
   @Test
   void cancelAndCompletionRaceHasOneTerminalState() throws Exception {
     var task = create();

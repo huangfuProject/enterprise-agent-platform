@@ -8,9 +8,15 @@ import jakarta.validation.Validation;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** 确定性 DTO 与状态机测试，不依赖数据库和外部模型。 */
+/**
+ * 确定性 DTO 与状态机测试，不依赖数据库和外部模型。
+ *
+ * @author chomy
+ **/
 class CoreTest {
-  /** 验证嵌套 DTO、预算、空消息/空集合与非有限数值约束。 */
+  /**
+   * 验证嵌套 DTO、预算、空消息/空集合与非有限数值约束。
+   **/
   @Test
   void validatesInputAndLimits() {
     try (var factory = Validation.buildDefaultValidatorFactory()) {
@@ -26,7 +32,9 @@ class CoreTest {
     }
   }
 
-  /** 断言非法回退、取消后的成功覆盖及任何终态迁移均被拒绝。 */
+  /**
+   * 断言非法回退、取消后的成功覆盖及任何终态迁移均被拒绝。
+   **/
   @Test
   void guardsTransitionsAndTerminalStates() {
     assertThat(TaskState.QUEUED.allows(TaskState.CLAIMED)).isTrue();

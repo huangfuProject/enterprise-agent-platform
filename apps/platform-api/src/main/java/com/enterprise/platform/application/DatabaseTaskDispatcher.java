@@ -13,7 +13,9 @@ import org.springframework.stereotype.Component;
  * 基于 PostgreSQL 的有限并发调度与 Runtime 对账。
  *
  * <p>数据库领取/回写与外部 HTTP 分离；失联按租约失败关闭，不自动重放未知副作用。
- */
+ *
+ * @author chomy
+ **/
 @Component
 @ConditionalOnProperty(name = "p0.scheduler-enabled", havingValue = "true", matchIfMissing = true)
 public class DatabaseTaskDispatcher {
@@ -23,7 +25,9 @@ public class DatabaseTaskDispatcher {
   private final String owner = UUID.randomUUID().toString();
   private final Logger log = LoggerFactory.getLogger(getClass());
 
-  /** 注入执行适配器；每个调度器实例拥有独立租约 owner，重启不会复用旧身份。 */
+  /**
+   * 注入执行适配器；每个调度器实例拥有独立租约 owner，重启不会复用旧身份。
+   **/
   public DatabaseTaskDispatcher(TaskRepository repository, TaskExecutionEngine engine) {
     this.repository = repository;
     this.engine = engine;
@@ -33,7 +37,7 @@ public class DatabaseTaskDispatcher {
    * 运行一轮有界调度。
    *
    * <p>先回收过期租约，再领取任务并查询 Runtime。单个任务通信异常不阻塞其他任务的 后续对账；续租仅在成功取得快照和事件、并通过持有者校验后发生。
-   */
+   **/
   @Scheduled(fixedDelayString = "${p0.dispatch-ms}")
   public void tick() {
     try {
