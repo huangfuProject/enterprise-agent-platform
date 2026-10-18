@@ -1,4 +1,6 @@
-"""导出自有边界 Schema 与合并 OpenAPI；不会启动 Runtime 或调用模型。"""
+"""
+导出自有边界 Schema 与合并 OpenAPI；不会启动 Runtime 或调用模型。
+"""
 
 import json
 from pathlib import Path
@@ -129,10 +131,12 @@ spec["components"]["schemas"]["TaskEvent"] = {
 def operation(
     operation_id, response_schema, success="200", body=False, task=False, events=False
 ):
-    """构造公共 API 的操作描述，保持默认错误、任务路径和分页参数的一致性。
+    """
+    构造公共 API 的操作描述，保持默认错误、任务路径和分页参数的一致性。
 
     脚本顶层会写出契约快照，应作为导出命令执行；模型只引用边界 DTO，
-    不导出 LangGraph State。"""
+    不导出 LangGraph State。
+    """
     result = {
         "operationId": operation_id,
         "servers": [{"url": "http://127.0.0.1:8080"}],

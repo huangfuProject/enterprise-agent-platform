@@ -1,4 +1,6 @@
-"""Java/Python v1 边界模型；与 LangGraph 内部消息、State、Checkpoint 对象隔离。"""
+"""
+Java/Python v1 边界模型；与 LangGraph 内部消息、State、Checkpoint 对象隔离。
+"""
 
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -107,7 +109,9 @@ class ExecutionStatus(Contract):
 
 
 def now() -> datetime:
-    """返回带 UTC 时区的事件时间。
+    """
+    返回带 UTC 时区的事件时间。
 
-    墙上时钟用于展示和关联；超时判断应使用 monotonic，跨机器事件排序依赖 sequence。"""
+    墙上时钟用于展示和关联；超时判断应使用 monotonic，跨机器事件排序依赖 sequence。
+    """
     return datetime.now(UTC)

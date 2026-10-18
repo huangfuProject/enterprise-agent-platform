@@ -1,4 +1,6 @@
-"""显式启用的真实模型测试；仅存在密钥不会自动触发外部调用或费用。"""
+"""
+显式启用的真实模型测试；仅存在密钥不会自动触发外部调用或费用。
+"""
 
 import os
 import threading
@@ -14,7 +16,9 @@ from agent_runtime.harness import build_agent, parse_result
 @pytest.mark.live_model
 @pytest.mark.skipif(os.getenv("RUN_LIVE_MODEL") != "true", reason="RUN_LIVE_MODEL not enabled")
 def test_live_model_tools_and_structured_result(tmp_path):
-    """要求主/子工具真实完成、结果一致且 Checkpoint 已生成，不能仅凭最终文本判定通过。"""
+    """
+    要求主/子工具真实完成、结果一致且 Checkpoint 已生成，不能仅凭最终文本判定通过。
+    """
     config = ModelConfig.from_env()
     assert config.provider == "openai-compatible"
     events = []

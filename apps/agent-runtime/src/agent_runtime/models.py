@@ -1,4 +1,6 @@
-"""模型适配边界：Fake 只产生工具请求，真实 Provider 的客户端创建集中在此模块。"""
+"""
+模型适配边界：Fake 只产生工具请求，真实 Provider 的客户端创建集中在此模块。
+"""
 
 import json
 import os
@@ -14,10 +16,12 @@ from .config import ModelConfig
 
 
 class DeterministicModel(BaseChatModel):
-    """用于稳定机制测试的聊天模型，不直接调用任何业务工具。
+    """
+    用于稳定机制测试的聊天模型，不直接调用任何业务工具。
 
     根据已经回传的 ToolMessage 决定下一条工具请求；seen 仅供隔离测试观察。
-    unavailable/fail_child/delay_seconds 是显式故障注入参数。"""
+    unavailable/fail_child/delay_seconds 是显式故障注入参数。
+    """
 
     role: str = "main"
     values: list[float] = Field(default_factory=lambda: [1, 2, 3])
@@ -28,15 +32,21 @@ class DeterministicModel(BaseChatModel):
 
     @property
     def _llm_type(self) -> str:
-        """返回框架使用的模型类型标识，不表示真实模型或供应商能力。"""
+        """
+        返回框架使用的模型类型标识，不表示真实模型或供应商能力。
+        """
         return "p0-deterministic"
 
     def bind_tools(self, tools: Any, **kwargs: Any) -> "DeterministicModel":
-        """满足框架工具绑定接口；Fake 按固定协议生成调用，不依赖外部模型。"""
+        """
+        满足框架工具绑定接口；Fake 按固定协议生成调用，不依赖外部模型。
+        """
         return self
 
     def _generate(self, messages: list, stop: Any = None, run_manager: Any = None, **kwargs: Any):
-        """按主/子角色推进固定回合，复用真实工具结果构造最后的结构化响应。"""
+        """
+        按主/子角色推进固定回合，复用真实工具结果构造最后的结构化响应。
+        """
         self.seen.append(messages)
         if self.delay_seconds:
             time.sleep(self.delay_seconds)
@@ -86,23 +96,29 @@ class DeterministicModel(BaseChatModel):
 
     @staticmethod
     def _reply(content: str, calls: list | None = None) -> ChatResult:
-        """将固定内容和工具调用包装为 LangChain 标准 ChatResult。"""
+        """
+        将固定内容和工具调用包装为 LangChain 标准 ChatResult。
+        """
         return ChatResult(
             generations=[ChatGeneration(message=AIMessage(content=content, tool_calls=calls or []))]
         )
 
 
 def build_model(config: ModelConfig, *, role: str, values: list[float]) -> BaseChatModel:
-    """创建指定角色使用的聊天模型。
+    """
+    创建指定角色使用的聊天模型。
 
     Args:
         config: Provider、端点、超时及密钥环境变量引用。
         role: 主 Agent 或统计专家；Fake 据此选择固定回合。
         values: 本次任务的有限样例数据，用于 Fake 的确定性请求。
+
     Returns:
         可由 DeepAgents 调用的 BaseChatModel；不会在创建时发起模型推理。
+
     Raises:
-        ValueError: Provider 不支持或真实模型缺少密钥配置。"""
+        ValueError: Provider 不支持或真实模型缺少密钥配置。
+    """
     if config.provider == "fake":
         return DeterministicModel(role=role, values=values, delay_seconds=config.fake_delay_seconds)
     if config.provider == "openai-compatible":

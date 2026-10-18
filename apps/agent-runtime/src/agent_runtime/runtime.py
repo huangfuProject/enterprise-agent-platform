@@ -1,4 +1,6 @@
-"""单 Runtime 的进程执行器：用持久去重、独立子进程和有界监控控制执行生命周期。"""
+"""
+单 Runtime 的进程执行器：用持久去重、独立子进程和有界监控控制执行生命周期。
+"""
 
 import fcntl
 import json
@@ -18,15 +20,19 @@ from .store import RuntimeStore
 
 
 def execute(directory: str, raw: dict, config: ModelConfig, cancelled):
-    """子进程入口：创建图、执行 Agent、记录结果或安全失败。
+    """
+    子进程入口：创建图、执行 Agent、记录结果或安全失败。
 
     仅接收可序列化请求与不含密钥值的 ModelConfig；真实密钥按环境变量引用读取。
-    SQLite Checkpoint 与执行元数据分别管理，不提供与 Java 数据库的分布式事务。"""
+    SQLite Checkpoint 与执行元数据分别管理，不提供与 Java 数据库的分布式事务。
+    """
     # spawn 后单独监控父身份；Java 另以租约识别整个 Runtime 服务的失联。
     parent_pid = os.getppid()
 
     def watch_parent():
-        """检测 Runtime 父进程死亡，防止其被强杀后留下继续运行的无主执行。"""
+        """
+        检测 Runtime 父进程死亡，防止其被强杀后留下继续运行的无主执行。
+        """
         while True:
             time.sleep(0.2)
             if os.getppid() != parent_pid:
@@ -39,7 +45,9 @@ def execute(directory: str, raw: dict, config: ModelConfig, cancelled):
     store = RuntimeStore(directory)
 
     def emit(kind, **kw):
-        """先持久化事件，再输出有限关联元数据；不记录消息内容或模型凭证。"""
+        """
+        先持久化事件，再输出有限关联元数据；不记录消息内容或模型凭证。
+        """
         store.emit(req, kind, **kw)
         logging.getLogger("agent_runtime.execution").info(
             json.dumps(
@@ -96,12 +104,16 @@ def execute(directory: str, raw: dict, config: ModelConfig, cancelled):
 
 
 class Runtime:
-    """单进程 Runtime 所有者，管理目录锁、已启动子进程和故障监控。
+    """
+    单进程 Runtime 所有者，管理目录锁、已启动子进程和故障监控。
 
-    每目录只能有一个所有者；它是本地 PoC，不是分布式 Worker 调度器。"""
+    每目录只能有一个所有者；它是本地 PoC，不是分布式 Worker 调度器。
+    """
 
     def __init__(self, directory: str, config: ModelConfig):
-        """取得目录独占锁后恢复未知执行；不自动重放先前可能已发生的工具调用。"""
+        """
+        取得目录独占锁后恢复未知执行；不自动重放先前可能已发生的工具调用。
+        """
         Path(directory).mkdir(parents=True, exist_ok=True)
         # 锁句柄必须贯穿 Runtime 生命周期，不能在构造结束时提前关闭。
         self._owner_lock = open(Path(directory) / "runtime.lock", "a")  # noqa: SIM115 - held until close()
@@ -118,7 +130,9 @@ class Runtime:
         self.store.recover()
 
     def submit(self, req: TaskExecutionRequest):
-        """持久化并去重请求，仅为首次接受且未预先取消的执行启动一个 spawn 子进程。"""
+        """
+        持久化并去重请求，仅为首次接受且未预先取消的执行启动一个 spawn 子进程。
+        """
         with self.lock:
             if self.closed:
                 raise RuntimeError("RUNTIME_CLOSED")
@@ -139,9 +153,11 @@ class Runtime:
             return snapshot
 
     def _monitor(self, req, process, event):
-        """监督子进程的协作取消、总期限和异常退出，最终由 Store 原子提交终态。
+        """
+        监督子进程的协作取消、总期限和异常退出，最终由 Store 原子提交终态。
 
-        使用 monotonic 计算期限；终止进程不代表能够回滚未来工具的外部副作用。"""
+        使用 monotonic 计算期限；终止进程不代表能够回滚未来工具的外部副作用。
+        """
         # 监控器负责整次执行时限；模型客户端超时只限制单次外部调用。
         deadline = time.monotonic() + req.limits.timeout_seconds
         while process.is_alive():
@@ -177,7 +193,9 @@ class Runtime:
             self.children.pop(req.execution_id, None)
 
     def close(self):
-        """禁止新提交并回收已知子进程，然后释放本 Runtime 持有的目录锁。"""
+        """
+        禁止新提交并回收已知子进程，然后释放本 Runtime 持有的目录锁。
+        """
         with self.lock:
             self.closed = True
             children = list(self.children.values())

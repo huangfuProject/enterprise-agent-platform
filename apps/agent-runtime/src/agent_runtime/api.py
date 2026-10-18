@@ -1,4 +1,6 @@
-"""内部 HTTP 协议适配：工厂创建应用，lifespan 显式获取/释放 Runtime 资源。"""
+"""
+内部 HTTP 协议适配：工厂创建应用，lifespan 显式获取/释放 Runtime 资源。
+"""
 
 import os
 from contextlib import asynccontextmanager
@@ -13,13 +15,17 @@ from .store import Conflict
 
 
 def create_app(directory: str | None = None, config: ModelConfig | None = None):
-    """创建 FastAPI 应用而不启动执行资源。
+    """
+    创建 FastAPI 应用而不启动执行资源。
 
-    测试可传入独立目录和 Fake 配置；实际目录锁、恢复和进程管理在 lifespan 启动。"""
+    测试可传入独立目录和 Fake 配置；实际目录锁、恢复和进程管理在 lifespan 启动。
+    """
 
     @asynccontextmanager
     async def lifespan(app):
-        """在 ASGI 生命周期内创建唯一 Runtime，并在正常关闭时回收执行子进程。"""
+        """
+        在 ASGI 生命周期内创建唯一 Runtime，并在正常关闭时回收执行子进程。
+        """
         app.state.runtime = Runtime(
             directory or os.getenv("RUNTIME_DATA_DIR", ".data/runtime"),
             config or ModelConfig.from_env(),

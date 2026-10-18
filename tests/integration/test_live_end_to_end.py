@@ -1,4 +1,6 @@
-"""真实模型端到端验收；必须显式 RUN_LIVE_MODEL，使用独立 live 数据库避免 Fake 竞争。"""
+"""
+真实模型端到端验收；必须显式 RUN_LIVE_MODEL，使用独立 live 数据库避免 Fake 竞争。
+"""
 
 import contextlib
 import os
@@ -17,10 +19,12 @@ from conftest import ROOT, free_port, poll
     os.getenv("RUN_LIVE_MODEL") != "true", reason="RUN_LIVE_MODEL not enabled"
 )
 def test_live_model_java_runtime_chain(tmp_path):
-    """启动自建 Java/Runtime 进程，验证指定真实模型的工具、子 Agent、结果和事件。
+    """
+    启动自建 Java/Runtime 进程，验证指定真实模型的工具、子 Agent、结果和事件。
 
     只保留有限结构化证据，不把环境、HTTP 认证头或模型密钥写入报告；
-    结束后回收本测试启动的进程，不删除数据库或影响开发服务。"""
+    结束后回收本测试启动的进程，不删除数据库或影响开发服务。
+    """
     settings = dict(
         line.split("=", 1)
         for line in (ROOT / ".env").read_text().splitlines()
@@ -122,7 +126,9 @@ def test_live_model_java_runtime_chain(tmp_path):
             url = base + "/api/v1/tasks/" + task["task_id"]
 
             def completed():
-                """查询 Java 业务终态；尚未完成时返回空以继续有限轮询。"""
+                """
+                查询 Java 业务终态；尚未完成时返回空以继续有限轮询。
+                """
                 snapshot = httpx.get(url, timeout=5).json()
                 return (
                     snapshot

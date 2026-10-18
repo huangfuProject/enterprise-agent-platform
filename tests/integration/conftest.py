@@ -1,4 +1,6 @@
-"""跨进程测试夹具：真实 Java/Python/PostgreSQL，通过本地代理注入通信故障。"""
+"""
+跨进程测试夹具：真实 Java/Python/PostgreSQL，通过本地代理注入通信故障。
+"""
 import contextlib
 import http.server
 import os
@@ -19,14 +21,18 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def free_port():
-    """向系统申请一个暂时空闲的本地端口；关闭探测 socket 后交给测试进程使用。"""
+    """
+    向系统申请一个暂时空闲的本地端口；关闭探测 socket 后交给测试进程使用。
+    """
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
 
 
 def poll(fn, timeout=30):
-    """在有限期限内重试观察条件；只忽略预期的连接/暂缺数据，断言错误直接暴露。"""
+    """
+    在有限期限内重试观察条件；只忽略预期的连接/暂缺数据，断言错误直接暴露。
+    """
     end = time.monotonic() + timeout
     while time.monotonic() < end:
         try:
@@ -41,10 +47,12 @@ def poll(fn, timeout=30):
 
 @pytest.fixture(scope="session")
 def stack(tmp_path_factory):
-    """启动隔离测试栈并在结束时回收自建进程/代理。
+    """
+    启动隔离测试栈并在结束时回收自建进程/代理。
 
     使用专用 eap_p0_test，明确强制 Fake；不因开发机配置真实模型而产生意外调用。
-    数据库故障只关闭本地转发连接，不停止远端 PostgreSQL 或已有服务。"""
+    数据库故障只关闭本地转发连接，不停止远端 PostgreSQL 或已有服务。
+    """
     temp = tmp_path_factory.mktemp("eap-stack")
     cfg = dict(line.split("=", 1) for line in (ROOT / ".env").read_text().splitlines()
                if line and not line.startswith("#") and "=" in line)
@@ -56,9 +64,13 @@ def stack(tmp_path_factory):
     allowed.set()
 
     class PgProxy(socketserver.BaseRequestHandler):
-        """本地 TCP 故障边界；allowed 清除后终止已有转发并拒绝新连接。"""
+        """
+        本地 TCP 故障边界；allowed 清除后终止已有转发并拒绝新连接。
+        """
         def handle(self):
-            """双向转发 PostgreSQL 字节流；按短 select 周期检查故障开关。"""
+            """
+            双向转发 PostgreSQL 字节流；按短 select 周期检查故障开关。
+            """
             if not allowed.is_set():
                 return
             try:
@@ -81,13 +93,19 @@ def stack(tmp_path_factory):
     submit_count = {}
 
     class RuntimeProxy(http.server.BaseHTTPRequestHandler):
-        """转发真实 Runtime 请求，故意延迟提交响应以构造结果未知窗口。"""
+        """
+        转发真实 Runtime 请求，故意延迟提交响应以构造结果未知窗口。
+        """
         def log_message(self, *args):
-            """关闭默认 HTTP 日志；仅保存测试需要的有界证据。"""
+            """
+            关闭默认 HTTP 日志；仅保存测试需要的有界证据。
+            """
             pass
 
         def forward(self):
-            """先把请求送达 Runtime，再延迟 Java 可见响应，证明客户端超时不等于执行停止。"""
+            """
+            先把请求送达 Runtime，再延迟 Java 可见响应，证明客户端超时不等于执行停止。
+            """
             payload = self.rfile.read(int(self.headers.get("Content-Length", 0)))
             try:
                 response = httpx.request(self.command, f"http://127.0.0.1:{runtime_port}{self.path}",
