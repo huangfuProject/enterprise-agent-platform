@@ -2,6 +2,8 @@
 
 日期：2026-10-17。状态：P0 已实现并测试，生产适用性未验证。
 
+> 后续变更：显式数据库行锁与“不引入 Redis”由 ADR-0003 替代；Java 数据访问由 ADR-0002 改为 MyBatis-Plus。下文保留原始决策背景，当前实现及未验证状态以新 ADR 为准。
+
 ## 背景与决定
 
 保持 Java 21/Spring Boot 3.x、Python 3.12、Vue 3、PostgreSQL 基线。Java 是业务任务状态的唯一权威；Python 是执行快照、Agent 状态和 Checkpoint 的拥有者。HTTP JSON v1 + 拉取事件，不引入 Redis、Temporal 或消息中间件。

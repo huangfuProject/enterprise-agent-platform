@@ -11,3 +11,11 @@
 9. **基础设施**：PostgreSQL 独立服务链路与 Compose 配置已校验；完整应用 Compose 部署尚未验收。MinIO 仅预留，未拉取/验收；Redis 不需要。未构建全服务 OCI 镜像或 Helm。
 10. **离线/生产**：锁文件与安装步骤具备，不代表干净机器离线安装已通过；没有 Wheelhouse、镜像包、SBOM、漏洞扫描、备份恢复或容量/性能验收。CI 执行结果以仓库检查记录为准。
 11. **内部错误格式**：Python 参数错误使用422，与 Java 公共错误 DTO 不完全一致；运行失败当前归为 AGENT_FAILED，详细模型/策略错误未细分。不会把可能包含凭证的供应商异常返回给 API。
+
+## Java 持久化迁移待验证
+
+2026-10-18 已将 Java 数据访问改为 MyBatis-Plus 3.5.17。服务器关机，按维护者要求本次未运行编译、单元或数据库/跨进程验证。实体/JSONB/Record 映射、事务及并发语义仍需回归；历史 JdbcTemplate 版本测试不能代替当前版本证据。迁移及恢复后的验证入口见 ADR-0002。
+
+## Redisson 协调待验证
+
+Java 新增 Redis 必需依赖；已移除显式 SELECT FOR UPDATE，普通数据库写入仍有内部锁。任务级 Redis 锁配合数据库 version CAS/执行 fence，不能承诺锁永不失效或 exactly-once。Mock 单元测试、真实 Redis 互斥/断连/watchdog、长暂停、数据库及跨进程回归本次均未运行；候选扫描不承诺严格 FIFO，生产 Redis 高可用未验证。

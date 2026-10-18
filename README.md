@@ -9,14 +9,14 @@ Java 控制平面与独立 Python Agent Runtime 的工程基线。当前提供�
 - Java 21、Maven 3.9+。
 - Python 3.12；Python 3.13 尚未验证。
 - Node.js 24、npm。
-- PostgreSQL 17；开发环境可使用 Docker Compose。
+- PostgreSQL 17、Redis 7.4；开发环境可使用 Docker Compose。
 
 ```text
-apps/platform-api       Spring Boot / JDBC / Flyway
+apps/platform-api       Spring Boot / MyBatis-Plus / Flyway
 apps/agent-runtime      FastAPI / DeepAgents / LangGraph
 apps/web                Vue / TypeScript / Vite
 packages/contracts/v1   JSON Schema 与 OpenAPI
-infrastructure/docker   PostgreSQL 和可选 MinIO 配置
+infrastructure/docker   PostgreSQL、Redis 和可选 MinIO 配置
 scripts                 构建、启动、测试与契约导出
 tests/integration       跨进程与故障注入测试
 docs/api                接口与执行语义
@@ -56,15 +56,15 @@ MAVEN_SETTINGS=/path/to/settings.xml
 
 ```bash
 test -f .env || cp .env.example .env
-# 编辑 .env，设置独立开发数据库的密码。
+# 编辑 .env，设置独立开发 PostgreSQL 和 Redis 的密码。
 set -a
 source .env
 set +a
-docker compose --env-file .env -f infrastructure/docker/compose.yml up -d postgres
+docker compose --env-file .env -f infrastructure/docker/compose.yml up -d postgres redis
 ./scripts/mvn.sh -B verify
 ```
 
-也可以直接使用已有 PostgreSQL，配置 `POSTGRES_HOST`、`POSTGRES_PORT`、`POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD` 后跳过 Compose。受限网络可以通过 `POSTGRES_IMAGE` 指定可达镜像源。
+也可以直接使用已有 PostgreSQL，配置 `POSTGRES_HOST`、`POSTGRES_PORT`、`POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD` 后复用已有数据库；同时需要可用 Redis，通过 `REDIS_ADDRESS`、`REDIS_PASSWORD`、`REDIS_DATABASE` 配置。使用已有 Redis 时可跳过 Compose 的 Redis 服务。受限网络可通过 `POSTGRES_IMAGE`、`REDIS_IMAGE` 指定可达镜像源。
 
 分别在三个终端、从根目录启动：
 
@@ -75,7 +75,7 @@ source .env
 set +a
 ./scripts/run-runtime.sh
 
-# 终端2：导出数据库配置，启动 Java
+# 终端2：导出 PostgreSQL/Redis 配置，启动 Java
 set -a
 source .env
 set +a
@@ -138,3 +138,7 @@ RUN_LIVE_MODEL=true "${RUNTIME_PYTHON:-python}" -m pytest tests/integration/test
 端到端真实模型测试使用独立的 `eap_p0_live_test`；配置的开发数据库账号需具备创建该测试库的权限。没有显式开启时不会调用外部模型。
 
 架构与边界见[实现架构](docs/p0/architecture.md)、[已知限制](docs/p0/known-limitations.md)、[执行引擎决策](docs/adr/0001-p0-execution-and-frameworks.md)及[API说明](docs/api/v1.md)。
+
+Java 持久化使用 MyBatis-Plus 3.5.17，普通操作走 BaseMapper，原子领取与租约等 SQL 位于 `apps/platform-api/src/main/resources/mapper/`。迁移决策与验证状态见 [ADR-0002](docs/adr/0002-mybatis-plus-persistence.md)；本次迁移测试尚未运行。
+
+任务级分布式锁通过 `DistributedLock` 统一封装，当前实现为 Redisson Core 3.52.0。Java 需要连接 Redis；任务领取、取消、对账及失联处理使用同一任务键，锁只覆盖短数据库事务。`LOCK_WAIT_MS` 设置锁竞争等待，`LOCK_WATCHDOG_TIMEOUT_MS` 设置续期窗口，`LOCK_KEY_PREFIX` 隔离环境；同一数据库所有实例必须使用相同前缀。Redis 失联不降级为无锁执行，数据库保留 version CAS、幂等唯一约束和执行 fence。详细语义及未验证项见 [ADR-0003](docs/adr/0003-redisson-task-locks.md)。此次改动未运行验证。

@@ -20,6 +20,16 @@ spring:
   # 已执行迁移是历史事实，后续 Schema 变化应追加版本而不是编辑旧文件。
   flyway:
     enabled: true
+# XML 保留 PostgreSQL 原子领取与租约 SQL；普通操作使用 MyBatis-Plus BaseMapper。
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    # 版本和运行快照必须重新访问数据库，不能复用旧状态。
+    local-cache-scope: statement
+    cache-enabled: false
+  global-config:
+    banner: false
 management:
   endpoints:
     web:
@@ -32,3 +42,12 @@ p0:
   dispatch-ms: ${DISPATCH_MS:500}
   http-timeout-ms: ${RUNTIME_HTTP_TIMEOUT_MS:2000}
   scheduler-enabled: ${SCHEDULER_ENABLED:true}
+
+  # Redis 锁只覆盖短数据库事务；任务运行期间不持有锁。
+  lock:
+    address: ${REDIS_ADDRESS:redis://127.0.0.1:56379}
+    password: ${REDIS_PASSWORD:}
+    database: ${REDIS_DATABASE:0}
+    key-prefix: ${LOCK_KEY_PREFIX:enterprise-agent:${POSTGRES_DB:eap_p0}:lock:}
+    watchdog-timeout-ms: ${LOCK_WATCHDOG_TIMEOUT_MS:30000}
+    wait-ms: ${LOCK_WAIT_MS:1000}

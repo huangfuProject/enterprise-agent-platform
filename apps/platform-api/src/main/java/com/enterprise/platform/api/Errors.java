@@ -1,6 +1,7 @@
 package com.enterprise.platform.api;
 
 import com.enterprise.platform.application.TaskException;
+import com.enterprise.platform.application.locking.DistributedLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import org.springframework.dao.DataAccessException;
@@ -52,6 +53,14 @@ public class Errors {
   @ExceptionHandler(DataAccessException.class)
   ResponseEntity<?> database(Exception e, HttpServletRequest req) {
     return response(503, "DATABASE_UNAVAILABLE", req);
+  }
+
+  /**
+   * Redis 锁不可用或获取被中断时返回503，不泄露底层连接异常。
+   **/
+  @ExceptionHandler(DistributedLockException.class)
+  ResponseEntity<?> lock(DistributedLockException e, HttpServletRequest req) {
+    return response(503, e.getMessage(), req);
   }
 
   /**

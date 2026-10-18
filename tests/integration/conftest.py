@@ -56,7 +56,7 @@ def stack(tmp_path_factory):
     temp = tmp_path_factory.mktemp("eap-stack")
     cfg = dict(line.split("=", 1) for line in (ROOT / ".env").read_text().splitlines()
                if line and not line.startswith("#") and "=" in line)
-    cfg.update({k: v for k, v in os.environ.items() if k.startswith("POSTGRES_")})
+    cfg.update({k: v for k, v in os.environ.items() if k.startswith(("POSTGRES_", "REDIS_", "LOCK_"))})
     cfg["POSTGRES_DB"] = "eap_p0_test"
     runtime_port, api_port = free_port(), free_port()
     # 一个开关同时影响现有代理连接与后续连接，模拟数据库断连而不触碰共享 DB。

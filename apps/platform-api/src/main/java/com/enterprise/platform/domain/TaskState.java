@@ -5,7 +5,7 @@ import java.util.Set;
 /**
  * 业务任务状态机；Runtime ACCEPTED 与 Checkpoint 已保存均不是独立的任务终态。
  *
- * <p>Repository 在持有任务行锁时检查迁移。终态不可逆，取消只能承诺协作请求的生效顺序。
+ * <p>Repository 在任务分布式锁及版本 CAS 保护下检查迁移。终态不可逆，取消只能承诺协作请求的生效顺序。
  *
  * @author chomy
  **/

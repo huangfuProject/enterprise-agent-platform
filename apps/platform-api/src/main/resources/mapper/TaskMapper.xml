@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.enterprise.platform.infrastructure.persistence.TaskMapper">
+  <resultMap id="snapshot" type="com.enterprise.platform.domain.TaskRecord">
+    <constructor>
+      <arg column="task_id" javaType="String"/>
+      <arg column="execution_id" javaType="String"/>
+      <arg column="idempotency_key" javaType="String"/>
+      <arg column="trace_id" javaType="String"/>
+      <arg column="request_id" javaType="String"/>
+      <arg column="checkpoint_thread_id" javaType="String"/>
+      <arg column="state" javaType="com.enterprise.platform.domain.TaskState"/>
+      <arg column="run_status" javaType="String"/>
+      <arg column="lease_owner" javaType="String"/>
+      <arg column="fence" javaType="_long"/>
+      <arg column="input" javaType="com.fasterxml.jackson.databind.JsonNode" typeHandler="com.enterprise.platform.infrastructure.persistence.JsonNodeTypeHandler"/>
+      <arg column="limits" javaType="com.fasterxml.jackson.databind.JsonNode" typeHandler="com.enterprise.platform.infrastructure.persistence.JsonNodeTypeHandler"/>
+      <arg column="started_at" javaType="java.time.Instant"/>
+      <arg column="updated_at" javaType="java.time.Instant"/>
+      <arg column="error_code" javaType="String"/>
+      <arg column="error_message" javaType="String"/>
+      <arg column="result" javaType="com.fasterxml.jackson.databind.JsonNode" typeHandler="com.enterprise.platform.infrastructure.persistence.JsonNodeTypeHandler"/>
+      <arg column="checkpoint_id" javaType="String"/>
+      <arg column="runtime_event_cursor" javaType="_long"/>
+      <arg column="version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 联合快照始终单语句读取，业务 updated_at 与 Run 心跳时间保持区分。 -->
+  <sql id="snapshotColumns">
+    SELECT t.task_id, r.execution_id, t.idempotency_key, t.trace_id, r.request_id,
+      r.checkpoint_thread_id, t.state, r.status AS run_status, r.lease_owner, r.fence,
+      t.input, t.limits, r.started_at, t.updated_at, r.error_code, r.error_message,
+      r.result, r.checkpoint_id, r.runtime_event_cursor, t.version
+    FROM p0_task t JOIN p0_run r ON r.task_id = t.task_id
+  </sql>
+
+  <select id="selectSnapshot" resultMap="snapshot">
+    <include refid="snapshotColumns"/>
+    WHERE t.task_id = #{taskId}
+  </select>
+
+  <!-- 不能用先查后插取代唯一约束；同键并发提交由数据库决定唯一创建者。 -->
+  <insert id="insertIfAbsent">
+    INSERT INTO p0_task(task_id, idempotency_key, payload_hash, input, limits, trace_id, state)
+    VALUES (#{task.taskId}, #{task.idempotencyKey}, #{task.payloadHash},
+      #{task.input,typeHandler=com.enterprise.platform.infrastructure.persistence.JsonNodeTypeHandler},
+      #{task.limits,typeHandler=com.enterprise.platform.infrastructure.persistence.JsonNodeTypeHandler},
+      #{task.traceId}, #{task.state})
+    ON CONFLICT(idempotency_key) DO NOTHING
+  </insert>
+
+  <select id="selectQueuedCandidates" resultType="string">
+    SELECT task_id FROM p0_task WHERE state = 'QUEUED' ORDER BY created_at
+    LIMIT 32
+  </select>
+
+  <update id="compareAndSetState">
+    UPDATE p0_task SET state = #{state}, version = version + 1,
+      updated_at = CASE WHEN state != #{state} THEN clock_timestamp() ELSE updated_at END
+    WHERE task_id = #{taskId} AND version = #{version} AND state = #{expectedState}
+  </update>
+
+  <select id="selectOwned" resultMap="snapshot">
+    <include refid="snapshotColumns"/>
+    WHERE r.lease_owner = #{owner} AND r.lease_expires_at > clock_timestamp()
+      AND t.state IN ('CLAIMED', 'RUNNING', 'CANCEL_REQUESTED')
+    ORDER BY t.created_at LIMIT 4
+  </select>
+
+  <select id="selectExpiredCandidates" resultMap="snapshot">
+    <include refid="snapshotColumns"/>
+    WHERE t.state IN ('CLAIMED', 'RUNNING', 'CANCEL_REQUESTED')
+      AND r.lease_expires_at &lt; clock_timestamp()
+    ORDER BY r.lease_expires_at LIMIT 100
+  </select>
+</mapper>

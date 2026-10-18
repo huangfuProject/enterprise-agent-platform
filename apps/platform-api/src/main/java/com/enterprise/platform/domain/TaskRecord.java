@@ -25,6 +25,7 @@ import java.time.Instant;
  * @param result 经 Runtime 校验的结构化结果，可为空
  * @param checkpointId 最终可关联的图快照标识，可为空
  * @param runtimeEventCursor 已导入 Java 的 Runtime 事件序号
+ * @param version 数据库乐观并发版本，每次受控任务写事务递增
  *
  * @author chomy
  **/
@@ -47,4 +48,5 @@ public record TaskRecord(
     String errorMessage,
     JsonNode result,
     String checkpointId,
-    long runtimeEventCursor) {}
+    long runtimeEventCursor,
+    long version) {}

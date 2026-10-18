@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.enterprise.platform.infrastructure.persistence.RunMapper">
+
+  <!-- 租约统一使用数据库时钟，不依赖 Java 与 Runtime 主机的时钟一致。 -->
+  <update id="claim">
+    UPDATE p0_run SET lease_owner = #{owner},
+      lease_expires_at = clock_timestamp() + (#{leaseSeconds} * interval '1 second'),
+      heartbeat_at = clock_timestamp(), fence = fence + 1,
+      status = 'CLAIMED', updated_at = clock_timestamp()
+    WHERE execution_id = #{executionId}
+  </update>
+
+  <select id="countValidLease" resultType="int">
+    SELECT count(*) FROM p0_run WHERE execution_id = #{executionId} AND fence = #{fence}
+      AND lease_owner = #{owner} AND lease_expires_at > clock_timestamp()
+  </select>
+
+  <update id="expire">
+    UPDATE p0_run SET status = #{status}, fence = fence + 1, error_code = 'WORKER_LOST',
+      error_message = 'Lease expired; uncertain execution requires reconciliation',
+      updated_at = clock_timestamp()
+    WHERE execution_id = #{executionId} AND lease_expires_at &lt; clock_timestamp()
+  </update>
+
+  <!-- 自定义 SQL 明确写入 NULL，避免默认非空更新策略保留取消任务的迟到成功结果。 -->
+  <update id="reconcile">
+    UPDATE p0_run SET status = #{run.status},
+      started_at = coalesce(started_at, CAST(#{startedAt,jdbcType=VARCHAR} AS timestamptz)),
+      heartbeat_at = clock_timestamp(),
+      lease_expires_at = clock_timestamp() + (#{leaseSeconds} * interval '1 second'),
+      updated_at = clock_timestamp(), runtime_event_cursor = #{run.runtimeEventCursor},
+      result = #{run.result,jdbcType=OTHER,typeHandler=com.enterprise.platform.infrastructure.persistence.JsonNodeTypeHandler},
+      checkpoint_id = #{run.checkpointId,jdbcType=VARCHAR},
+      error_code = #{run.errorCode,jdbcType=VARCHAR},
+      error_message = #{run.errorMessage,jdbcType=VARCHAR}
+    WHERE execution_id = #{run.executionId} AND fence = #{fence} AND lease_owner = #{owner}
+      AND lease_expires_at > clock_timestamp()
+  </update>
+</mapper>

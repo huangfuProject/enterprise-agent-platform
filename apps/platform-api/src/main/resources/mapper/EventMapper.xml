@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.enterprise.platform.infrastructure.persistence.EventMapper">
+
+  <resultMap id="event" type="com.enterprise.platform.infrastructure.persistence.EventRow">
+    <constructor>
+      <arg column="execution_id" javaType="String"/>
+      <arg column="sequence" javaType="_long"/>
+      <arg column="event_type" javaType="String"/>
+      <arg column="timestamp" javaType="java.time.Instant"/>
+      <arg column="payload" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="com.enterprise.platform.infrastructure.persistence.JsonNodeTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 必须在持有任务分布式锁并通过 version CAS，或处于首次创建事务中使用；MAX + 1 本身不提供并发安全。 -->
+  <insert id="append">
+    INSERT INTO p0_event(task_id, sequence, execution_id, event_type, payload)
+    SELECT #{taskId}, coalesce(max(sequence), 0) + 1, #{executionId}, #{eventType},
+      #{payload,typeHandler=com.enterprise.platform.infrastructure.persistence.JsonNodeTypeHandler}
+    FROM p0_event WHERE task_id = #{taskId}
+  </insert>
+
+  <select id="selectAfter" resultMap="event">
+    SELECT execution_id, sequence, event_type, timestamp, payload FROM p0_event
+    WHERE task_id = #{taskId} AND sequence > #{after}
+    ORDER BY sequence LIMIT 500
+  </select>
+</mapper>
