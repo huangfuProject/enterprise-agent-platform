@@ -46,6 +46,10 @@ venv/
 .data/
 *.db*
 *.log
+/jangzang_docker/*.tar
+/jangzang_docker/backend/platform-api.jar
+/jangzang_docker/runtime/requirements.lock
+/jangzang_docker/runtime/src/
 
 # Internal plans, working records and environment-specific evidence stay local.
 # Publish only the maintained API, ADR and implementation reference documents.

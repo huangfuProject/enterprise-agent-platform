@@ -89,6 +89,56 @@ npm --prefix apps/web run dev
 
 Runtime 默认保存到 `.data/runtime`，可设置 `RUNTIME_DATA_DIR`。同一目录仅允许一个 Runtime，必须一起保留执行去重记录与 Checkpoint。MinIO 为可选基础设施，启用 `storage` profile 前设置 `MINIO_ROOT_PASSWORD`；文件管理功能尚未实现。
 
+## 使用 Docker Compose 部署 P0
+
+进入 `jangzang_docker/`。如果尚无 `.env`，从 `.env.example` 复制一份，再填写用户名、密码和模型配置。使用已有 PostgreSQL 和 Redis 时，填写容器可直接访问的服务地址，并为平台准备专用数据库和可执行 Flyway 迁移的账号。`host.docker.internal` 是 Docker Desktop 上访问宿主机的默认示例，Linux 部署时请按实际网络填写地址。
+
+已有三个镜像归档时可直接加载。仅有源码时先按本节末尾的命令构建镜像，再选择一份 Compose 启动。
+
+```bash
+cd jangzang_docker
+# AMD64 主机使用启用了 containerd 镜像存储的 Docker Engine，并改成 linux/amd64。
+for component in frontend backend runtime; do
+  docker load --platform linux/arm64 -i "${component}.tar"
+done
+
+# 方案一：使用已有 PostgreSQL 和 Redis
+docker compose -f docker-compose.yaml up -d --wait
+
+# 方案二：Compose 同时运行 PostgreSQL 和 Redis，按需二选一
+docker compose -f docker-compose.with-infra.yaml up -d --wait
+```
+
+每个归档都包含 Linux AMD64 和 ARM64。启用 containerd 镜像存储后也可以直接用 `docker load -i` 加载两种架构。在旧版 overlay2 镜像存储上，若目标架构无法从双架构归档加载，在启用了 containerd 的 Docker 上运行 `docker save --platform` 另存对应架构，或在目标机上从构建目录重新打包。
+
+五容器方案使用 Compose 内部的 PostgreSQL 和 Redis，保留 `.env` 中的数据库名、用户名和密码，并将数据库和 Runtime 的状态写入各自的命名卷。离线使用五容器方案时，还需事先准备官方 `postgres:17-alpine` 和 `redis:7.4-alpine` 镜像。停机或切换方案时使用启动时对应的 Compose 文件执行 `down`，命名卷会保留。
+
+将 `nginx-frontend.conf` 和 `nginx-backend.conf` 安装到宿主机 Nginx 在 `http` 块中加载的目录。替换两个示例域名、配置内网 DNS，需要时同步修改回环端口，然后执行 `nginx -t` 和 `nginx -s reload`。前台入口转发到 `127.0.0.1:18080`，并通过同源的 `/api/` 和 `/actuator/health` 访问后台。独立后台入口转发到 `127.0.0.1:18081`。前台容器通过 Docker DNS 解析 `backend`，Java 通过 Docker DNS 解析 `runtime`。Runtime 只有单实例，内部 API 不发布到宿主机。两个入口仅用于受控网络内的 P0 验证。
+
+Git 仓库保留构建定义和配置模板。获取源码后，从仓库根目录准备三个构建目录的资源。
+
+```bash
+./scripts/mvn.sh -B package
+npm --prefix apps/web ci --no-audit --no-fund
+npm --prefix apps/web run build
+
+cp apps/platform-api/target/platform-api-0.1.0.jar jangzang_docker/backend/platform-api.jar
+mkdir -p jangzang_docker/frontend/dist jangzang_docker/runtime/src/agent_runtime
+cp -R apps/web/dist/. jangzang_docker/frontend/dist/
+cp apps/agent-runtime/requirements.lock jangzang_docker/runtime/
+cp apps/agent-runtime/src/agent_runtime/*.py jangzang_docker/runtime/src/agent_runtime/
+```
+
+进入 `jangzang_docker/` 后可以分别构建三个镜像。重建需要访问官方基础镜像和 PyPI，或使用本地缓存或镜像源。
+
+```bash
+(cd frontend && docker build -t jangzang/frontend:0.1.0 .)
+(cd backend  && docker build -t jangzang/backend:0.1.0 .)
+(cd runtime  && docker build -t jangzang/runtime:0.1.0 .)
+```
+
+单机 `docker build` 默认构建当前架构。若需重制双架构归档，使用支持双架构构建的 Buildx 和启用 containerd 镜像存储的 Docker Engine，在构建命令中指定 `--platform linux/amd64,linux/arm64 --provenance=false`，再执行 `docker save -o <组件>.tar jangzang/<组件>:0.1.0`。本次构建环境直连 Docker Hub 超时，验证环境通过 Docker 的 `registry-mirrors` 配置使用 `https://docker.m.daocloud.io` 取得官方镜像。
+
 ## 任务 API
 
 ```bash
