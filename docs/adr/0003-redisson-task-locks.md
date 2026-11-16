@@ -1,12 +1,12 @@
 # ADR-0003：统一分布式锁与任务并发控制
 
-日期：2026-10-18。状态：按维护者要求实施，编译及运行验证未运行。
+记录日期为 2026-10-18。Redisson 任务锁及数据库 version CAS 已实施，后续本地数据库与跨进程回归已通过。
 
 ## 决定
 
 维护者明确要求将显式数据库行锁替换为 Redisson，并抽象可复用锁工具。新增 `DistributedLock` 接口及 `RedissonDistributedLock`，采用 Redisson Core 3.52.0，不引入无关的 Spring Data Redis 集成。
 
-官方参考：[Redisson 锁与同步器](https://redisson.pro/docs/data-and-services/locks-and-synchronizers/index.html)、[配置](https://redisson.pro/docs/configuration/)、[3.52.0 发布记录](https://github.com/redisson/redisson/blob/master/CHANGELOG.md)。选定版本已固定，但本次未执行依赖兼容性验证。
+官方资料见 [Redisson 锁与同步器](https://redisson.pro/docs/data-and-services/locks-and-synchronizers/index.html)、[配置](https://redisson.pro/docs/configuration/)和[发布记录](https://github.com/redisson/redisson/blob/master/CHANGELOG.md)。
 
 Redis 现在是 Java 任务协调的必需依赖。此决定替代 ADR-0001 中“不引入 Redis”的选择，以及 ADR-0002 的显式行锁与非 CAS version 策略；Java/Python 边界、PostgreSQL 持久化与 Flyway 保持。
 
@@ -17,7 +17,7 @@ locks.tryExecute("task:" + taskId, waitTime,
     () -> transactionTemplate.execute(status -> mutateTask()));
 ```
 
-- 资源键统一添加环境前缀；同一任务数据库的所有实例必须使用相同前缀。
+- 资源键统一添加 `LOCK_KEY_PREFIX`，同一任务数据库的所有实例必须使用相同前缀。`LOCK_WAIT_MS` 设置对账和取消的有限等待，`LOCK_WATCHDOG_TIMEOUT_MS` 配置续期窗口。
 - 有限等待，竞争未获锁返回空；Redis 错误/中断失败关闭，不降级为本地锁或无锁执行。
 - 使用不指定 leaseTime 的 tryLock 重载，由 watchdog 续期。正常路径由持有锁的同一线程 unlock，不使用 forceUnlock。
 - 严格顺序：获取 Redis 锁 → 数据库事务 → 提交/回滚 → 解锁。Repository 禁止这些写入口加入已有外层事务，避免提前释放锁。
@@ -48,4 +48,6 @@ Redis 锁不保证在故障切换、长 GC、网络分区下永远有效，因�
 
 服务关闭时数据库可保留任务，但 Java 启动和任务协调需要可用 Redis。单节点 Compose 仅供开发；不宣称已验证生产 Redis 高可用或故障切换安全。
 
-维护者说明服务器关机且无需验证，本次不运行编译、单元、数据库或跨进程测试。新增 Mock 单元测试覆盖竞争、异常释放、Redis失败、中断及解锁不确定结果；数据库测试新增陈旧版本拒写，均未运行。服务恢复后需验证跨 Java 实例互斥、锁失效与 CAS、watchdog、Redis断连、事务回滚、租约及取消竞态。
+迁移时未运行测试。2026-11-16 在单节点 PostgreSQL 和 Redis 环境执行 `./scripts/test-integration.sh`，Java 16 项与 Fake 跨进程 7 项通过。锁适配器 Mock 覆盖竞争、异常释放、Redis 错误、中断与解锁不确定。真实服务回归覆盖并发领取、陈旧 version 拒写、租约和取消竞态。
+
+跨 Java 实例互斥、watchdog 过期、真实 Redis 断连与故障切换仍待专门验证。

@@ -4,20 +4,22 @@
       "additionalProperties": false,
       "properties": {
         "max_steps": {
-          "default": 20,
           "maximum": 100,
           "minimum": 1,
           "title": "Max Steps",
           "type": "integer"
         },
         "timeout_seconds": {
-          "default": 120,
           "maximum": 300,
           "minimum": 1,
           "title": "Timeout Seconds",
           "type": "integer"
         }
       },
+      "required": [
+        "max_steps",
+        "timeout_seconds"
+      ],
       "title": "Limits",
       "type": "object"
     },
@@ -27,6 +29,7 @@
         "message": {
           "maxLength": 4000,
           "minLength": 1,
+          "pattern": "\\S",
           "title": "Message",
           "type": "string"
         },
@@ -41,7 +44,8 @@
         }
       },
       "required": [
-        "message"
+        "message",
+        "values"
       ],
       "title": "TaskInput",
       "type": "object"
@@ -52,6 +56,7 @@
     "idempotency_key": {
       "maxLength": 100,
       "minLength": 1,
+      "pattern": "\\S",
       "title": "Idempotency Key",
       "type": "string"
     },

@@ -61,6 +61,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "IDEMPOTENCY_CONFLICT or RUNTIME_CAPACITY",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeError"
+                }
+              }
+            }
           }
         },
         "servers": [
@@ -102,6 +112,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "EXECUTION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeError"
                 }
               }
             }
@@ -161,6 +181,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "EXECUTION_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeError"
                 }
               }
             }
@@ -244,16 +274,6 @@
               }
             }
           },
-          "404": {
-            "description": "Structured error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "409": {
             "description": "Structured error",
             "content": {
@@ -265,6 +285,16 @@
             }
           },
           "503": {
+            "description": "Structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
             "description": "Structured error",
             "content": {
               "application/json": {
@@ -306,16 +336,6 @@
               }
             }
           },
-          "400": {
-            "description": "Structured error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Structured error",
             "content": {
@@ -326,7 +346,7 @@
               }
             }
           },
-          "409": {
+          "503": {
             "description": "Structured error",
             "content": {
               "application/json": {
@@ -336,7 +356,7 @@
               }
             }
           },
-          "503": {
+          "500": {
             "description": "Structured error",
             "content": {
               "application/json": {
@@ -378,16 +398,6 @@
               }
             }
           },
-          "400": {
-            "description": "Structured error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Structured error",
             "content": {
@@ -409,6 +419,16 @@
             }
           },
           "503": {
+            "description": "Structured error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
             "description": "Structured error",
             "content": {
               "application/json": {
@@ -473,7 +493,7 @@
               }
             }
           },
-          "409": {
+          "503": {
             "description": "Structured error",
             "content": {
               "application/json": {
@@ -483,7 +503,7 @@
               }
             }
           },
-          "503": {
+          "500": {
             "description": "Structured error",
             "content": {
               "application/json": {
@@ -529,47 +549,33 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Structured error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Structured error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Structured error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
           },
           "503": {
-            "description": "Structured error",
+            "description": "Health status is DOWN or OUT_OF_SERVICE",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
@@ -996,6 +1002,17 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "RuntimeError": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
       },
       "TaskView": {
         "type": "object",

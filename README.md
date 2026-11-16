@@ -17,6 +17,7 @@ apps/agent-runtime      FastAPI / DeepAgents / LangGraph
 apps/web                Vue / TypeScript / Vite
 packages/contracts/v1   JSON Schema 与 OpenAPI
 infrastructure/docker   PostgreSQL、Redis 和可选 MinIO 配置
+jangzang_docker         应用镜像构建、Compose 部署和宿主机 Nginx 配置
 scripts                 构建、启动、测试与契约导出
 tests/integration       跨进程与故障注入测试
 docs/api                接口与执行语义
@@ -50,7 +51,7 @@ MAVEN_SETTINGS=/path/to/settings.xml
 
 设置 `MAVEN_SETTINGS` 后，每次 Maven 调用都会显式使用该配置；未设置时使用 Maven 默认设置。不要在本地工具链文件中复制业务凭证。
 
-离线环境应提前准备 Wheelhouse、Maven 仓库缓存、npm 缓存及镜像。完整离线安装尚未验收。
+从源码离线构建需要提前准备 Wheelhouse、Maven 仓库缓存、npm 缓存和基础镜像。已有应用镜像时可直接加载部署。完整断网部署仍待验收。
 
 ## 数据库与启动
 
@@ -93,7 +94,7 @@ Runtime 默认保存到 `.data/runtime`，可设置 `RUNTIME_DATA_DIR`。同一�
 
 进入 `jangzang_docker/`。如果尚无 `.env`，从 `.env.example` 复制一份，再填写用户名、密码和模型配置。使用已有 PostgreSQL 和 Redis 时，填写容器可直接访问的服务地址，并为平台准备专用数据库和可执行 Flyway 迁移的账号。`host.docker.internal` 是 Docker Desktop 上访问宿主机的默认示例，Linux 部署时请按实际网络填写地址。
 
-已有三个镜像归档时可直接加载。仅有源码时先按本节末尾的命令构建镜像，再选择一份 Compose 启动。
+已有三个镜像归档时可直接加载。仅有源码时先按本节末尾的命令构建镜像。
 
 ```bash
 cd jangzang_docker
@@ -101,7 +102,11 @@ cd jangzang_docker
 for component in frontend backend runtime; do
   docker load --platform linux/arm64 -i "${component}.tar"
 done
+```
 
+根据基础设施选择其中一份 Compose 文件。
+
+```bash
 # 方案一：使用已有 PostgreSQL 和 Redis
 docker compose -f docker-compose.yaml up -d --wait
 
@@ -137,7 +142,7 @@ cp apps/agent-runtime/src/agent_runtime/*.py jangzang_docker/runtime/src/agent_r
 (cd runtime  && docker build -t jangzang/runtime:0.1.0 .)
 ```
 
-单机 `docker build` 默认构建当前架构。若需重制双架构归档，使用支持双架构构建的 Buildx 和启用 containerd 镜像存储的 Docker Engine，在构建命令中指定 `--platform linux/amd64,linux/arm64 --provenance=false`，再执行 `docker save -o <组件>.tar jangzang/<组件>:0.1.0`。本次构建环境直连 Docker Hub 超时，验证环境通过 Docker 的 `registry-mirrors` 配置使用 `https://docker.m.daocloud.io` 取得官方镜像。
+单机 `docker build` 默认构建当前架构。若需重制双架构归档，使用支持双架构构建的 Buildx 和启用 containerd 镜像存储的 Docker Engine，在构建命令中指定 `--platform linux/amd64,linux/arm64 --provenance=false`，再执行 `docker save -o <组件>.tar jangzang/<组件>:0.1.0`。
 
 ## 任务 API
 
@@ -160,7 +165,7 @@ curl -sS -X POST http://127.0.0.1:8080/api/v1/tasks/TASK_ID/cancel
 ```bash
 ./scripts/test.sh
 
-# PostgreSQL 集成测试需要独立数据库 eap_p0_test。
+# 集成测试需要仓库根目录的 .env、专用数据库 eap_p0_test 和可用的测试 Redis。
 # 使用数据库管理工具提前执行 CREATE DATABASE eap_p0_test;
 set -a
 source .env
@@ -168,7 +173,7 @@ set +a
 ./scripts/test-integration.sh
 ```
 
-基础验证默认不启用 PostgreSQL 集成和真实模型用例；集成脚本显式启用数据库测试，启动临时 Java/Python 服务与本地故障代理。测试数据使用随机请求键，不清空数据库；不要让其他调度器同时消费测试库。
+基础验证默认跳过数据库集成和真实模型用例。集成脚本使用 `POSTGRES_*` 和 `REDIS_*` 配置，启用 Java 数据库测试，并通过临时 Java/Python 服务和本地代理运行跨进程故障测试。测试数据使用随机请求键，测试时让独立调度器专用 `eap_p0_test`。
 
 ```bash
 # 导出边界契约
@@ -187,8 +192,6 @@ RUN_LIVE_MODEL=true "${RUNTIME_PYTHON:-python}" -m pytest tests/integration/test
 
 端到端真实模型测试使用独立的 `eap_p0_live_test`；配置的开发数据库账号需具备创建该测试库的权限。没有显式开启时不会调用外部模型。
 
-架构与边界见[实现架构](docs/p0/architecture.md)、[已知限制](docs/p0/known-limitations.md)、[执行引擎决策](docs/adr/0001-p0-execution-and-frameworks.md)及[API说明](docs/api/v1.md)。
+Java 使用 MyBatis-Plus 读写 PostgreSQL，原子领取与租约 SQL 位于 `apps/platform-api/src/main/resources/mapper/`。Redis 为任务级变更提供短事务锁，PostgreSQL 以 version CAS、唯一约束和执行 fence 保护持久化状态。使用同一任务数据库的所有 Java 实例须配置相同的 `LOCK_KEY_PREFIX`。
 
-Java 持久化使用 MyBatis-Plus 3.5.17，普通操作走 BaseMapper，原子领取与租约等 SQL 位于 `apps/platform-api/src/main/resources/mapper/`。迁移决策与验证状态见 [ADR-0002](docs/adr/0002-mybatis-plus-persistence.md)；本次迁移测试尚未运行。
-
-任务级分布式锁通过 `DistributedLock` 统一封装，当前实现为 Redisson Core 3.52.0。Java 需要连接 Redis；任务领取、取消、对账及失联处理使用同一任务键，锁只覆盖短数据库事务。`LOCK_WAIT_MS` 设置锁竞争等待，`LOCK_WATCHDOG_TIMEOUT_MS` 设置续期窗口，`LOCK_KEY_PREFIX` 隔离环境；同一数据库所有实例必须使用相同前缀。Redis 失联不降级为无锁执行，数据库保留 version CAS、幂等唯一约束和执行 fence。详细语义及未验证项见 [ADR-0003](docs/adr/0003-redisson-task-locks.md)。此次改动未运行验证。
+详细说明见 [P0 实现架构](docs/p0/architecture.md)、[已知限制](docs/p0/known-limitations.md)、[v1 API](docs/api/v1.md)、[持久化 ADR](docs/adr/0002-mybatis-plus-persistence.md)和[任务锁 ADR](docs/adr/0003-redisson-task-locks.md)。

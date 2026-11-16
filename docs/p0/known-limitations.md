@@ -8,14 +8,14 @@
 6. **事件与时间**：部署时必须同步各节点时钟；任务事件仍以 sequence 为排序依据。Checkpoint/Runtime 元数据/PostgreSQL 不具备跨库原子提交。没有生产消息 Outbox、SSE、事件归档或分页保留策略。
 7. **版本敏感**：DeepAgents 默认文件工具的同名中间件替换、原生 task 上下文行为只对锁定版本有证据，升级必须回归。工具白名单不是生产授权引擎；无任意文件、网络、Shell 或代码执行能力。
 8. **输出与子 Agent**：真实 Provider 使用 ToolStrategy(AgentResult) 约束最终响应并以 Pydantic 校验；没有验证供应商原生 JSON Schema 解码模式。只允许一个固定模板、一层一次委派，子失败可降级，不支持动态任意角色、多子 Agent 并行或跨用户共享。
-9. **基础设施**：PostgreSQL 独立服务链路与 Compose 配置已校验；完整应用 Compose 部署尚未验收。MinIO 仅预留，未拉取/验收；Redis 不需要。未构建全服务 OCI 镜像或 Helm。
-10. **离线/生产**：锁文件与安装步骤具备，不代表干净机器离线安装已通过；没有 Wheelhouse、镜像包、SBOM、漏洞扫描、备份恢复或容量/性能验收。CI 执行结果以仓库检查记录为准。
+9. **基础设施**：Java 需要 PostgreSQL 和 Redis。三容器和五容器 Compose 已在 Mac Docker Desktop 验证，AMD64 应用闭环在模拟环境验证。MinIO 仍只预留可选基础设施，Artifact 尚未接入。P0 前端为连接检查页，任务状态可通过 API 查询。
+10. **离线与生产部署**：三个应用有 AMD64 和 ARM64 的 `docker save` 归档，五容器方案离线部署还需 PostgreSQL 和 Redis 基础设施镜像。实体 AMD64 主机、完整断网部署、Helm、SBOM、漏洞扫描、备份恢复与容量仍待验证。
 11. **内部错误格式**：Python 参数错误使用422，与 Java 公共错误 DTO 不完全一致；运行失败当前归为 AGENT_FAILED，详细模型/策略错误未细分。不会把可能包含凭证的供应商异常返回给 API。
 
-## Java 持久化迁移待验证
+## Redis 任务协调的验证边界
 
-2026-10-18 已将 Java 数据访问改为 MyBatis-Plus 3.5.17。服务器关机，按维护者要求本次未运行编译、单元或数据库/跨进程验证。实体/JSONB/Record 映射、事务及并发语义仍需回归；历史 JdbcTemplate 版本测试不能代替当前版本证据。迁移及恢复后的验证入口见 ADR-0002。
+在独立 PostgreSQL 与 Redis 上，Java 数据库回归和 Fake 跨进程故障测试已通过。跨 Java 实例互斥、Redis 断连与故障切换、watchdog 过期及长暂停后的锁行为仍待专门测试。候选扫描可能受锁竞争影响，领取顺序不保证严格 FIFO。数据库 CAS 和执行 fence 约束陈旧写入，副作用去重仍需独立机制。见 [ADR-0003](../adr/0003-redisson-task-locks.md)。
 
-## Redisson 协调待验证
+## CI 的基础设施缺口
 
-Java 新增 Redis 必需依赖；已移除显式 SELECT FOR UPDATE，普通数据库写入仍有内部锁。任务级 Redis 锁配合数据库 version CAS/执行 fence，不能承诺锁永不失效或 exactly-once。Mock 单元测试、真实 Redis 互斥/断连/watchdog、长暂停、数据库及跨进程回归本次均未运行；候选扫描不承诺严格 FIFO，生产 Redis 高可用未验证。
+当前 [GitHub Actions 流程](../../.github/workflows/ci.yml)只声明了 PostgreSQL 服务，Java 集成测试还需要 Redis。该缺口影响 CI 的集成步骤。上述验证结果来自本地隔离环境。

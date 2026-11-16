@@ -11,11 +11,21 @@ from agent_runtime.tools import ContextInput, ContextOutput, SummaryInput
 from pydantic import Field
 
 
-# 该类参与 Schema 导出，使用普通注释，避免注释变成正式 description 字段。
+# Java 公共入口要求显式输入和限制，Runtime 内部 DTO 才提供字段默认值。
+class TaskInput(contracts.TaskInput):
+    message: str = Field(min_length=1, max_length=4000, pattern=r"\S")
+    values: list[float] = Field(min_length=1, max_length=100)
+
+
+class Limits(contracts.Limits):
+    max_steps: int = Field(ge=1, le=100)
+    timeout_seconds: int = Field(ge=1, le=300)
+
+
 class CreateTask(contracts.Contract):
-    idempotency_key: str = Field(min_length=1, max_length=100)
-    input: contracts.TaskInput
-    limits: contracts.Limits
+    idempotency_key: str = Field(min_length=1, max_length=100, pattern=r"\S")
+    input: TaskInput
+    limits: Limits
 
 
 root = Path(__file__).resolve().parents[1]
@@ -44,6 +54,36 @@ spec["info"] = {
 for path in spec["paths"].values():
     for operation in path.values():
         operation["servers"] = [{"url": "http://127.0.0.1:8000"}]
+
+# FastAPI 的全局异常处理器不会自动把这些响应写入路由定义。
+spec["components"]["schemas"]["RuntimeError"] = {
+    "type": "object",
+    "required": ["code"],
+    "properties": {"code": {"type": "string"}},
+}
+for path, method, status, description in [
+    (
+        "/internal/v1/executions",
+        "post",
+        "409",
+        "IDEMPOTENCY_CONFLICT or RUNTIME_CAPACITY",
+    ),
+    ("/internal/v1/executions/{execution_id}", "get", "404", "EXECUTION_NOT_FOUND"),
+    (
+        "/internal/v1/executions/{execution_id}/events",
+        "get",
+        "404",
+        "EXECUTION_NOT_FOUND",
+    ),
+]:
+    spec["paths"][path][method]["responses"][status] = {
+        "description": description,
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/RuntimeError"}
+            }
+        },
+    }
 
 # JSON Schema 的 null 表示字段允许空值，不能用字符串 "null" 替代。
 nullable_string = {"type": ["string", "null"]}
@@ -129,7 +169,13 @@ spec["components"]["schemas"]["TaskEvent"] = {
 
 
 def operation(
-    operation_id, response_schema, success="200", body=False, task=False, events=False
+    operation_id,
+    response_schema,
+    success="200",
+    body=False,
+    task=False,
+    events=False,
+    errors=("404", "503", "500"),
 ):
     """
     构造公共 API 的操作描述，保持默认错误、任务路径和分页参数的一致性。
@@ -147,7 +193,7 @@ def operation(
             }
         },
     }
-    for code in ["400", "404", "409", "503"]:
+    for code in errors:
         result["responses"][code] = {
             "description": "Structured error",
             "content": {
@@ -184,13 +230,17 @@ def operation(
 # 合并 Java 公共 API 与 Python 内部 API；每个操作保留不同的服务地址。
 view = {"$ref": "#/components/schemas/TaskView"}
 spec["paths"]["/api/v1/tasks"] = {
-    "post": operation("createTask", view, "202", body=True)
+    "post": operation(
+        "createTask", view, "202", body=True, errors=("400", "409", "503", "500")
+    )
 }
 spec["paths"]["/api/v1/tasks/{task_id}"] = {
     "get": operation("getTask", view, task=True)
 }
 spec["paths"]["/api/v1/tasks/{task_id}/cancel"] = {
-    "post": operation("cancelTask", view, "202", task=True)
+    "post": operation(
+        "cancelTask", view, "202", task=True, errors=("404", "409", "503", "500")
+    )
 }
 spec["paths"]["/api/v1/tasks/{task_id}/events"] = {
     "get": operation(
@@ -198,11 +248,23 @@ spec["paths"]["/api/v1/tasks/{task_id}/events"] = {
         {"type": "array", "items": {"$ref": "#/components/schemas/TaskEvent"}},
         task=True,
         events=True,
+        errors=("400", "404", "503", "500"),
     )
 }
-spec["paths"]["/actuator/health"] = {
-    "get": operation("platformHealth", {"type": "object"})
+health = operation(
+    "platformHealth",
+    {
+        "type": "object",
+        "required": ["status"],
+        "properties": {"status": {"type": "string"}},
+    },
+    errors=(),
+)
+health["responses"]["503"] = {
+    **health["responses"]["200"],
+    "description": "Health status is DOWN or OUT_OF_SERVICE",
 }
+spec["paths"]["/actuator/health"] = {"get": health}
 (root / "packages/contracts/v1/openapi.json").write_text(
     json.dumps(spec, ensure_ascii=False, indent=2) + "\n"
 )

@@ -1,12 +1,12 @@
 # ADR-0001：P0 框架与执行边界
 
-日期：2026-10-17。状态：P0 已实现并测试，生产适用性未验证。
+记录日期为 2026-10-17。框架与执行边界仍适用，具体持久化与锁策略已由后续 ADR 更新。
 
-> 后续变更：显式数据库行锁与“不引入 Redis”由 ADR-0003 替代；Java 数据访问由 ADR-0002 改为 MyBatis-Plus。下文保留原始决策背景，当前实现及未验证状态以新 ADR 为准。
+> Java 数据访问见 [ADR-0002](0002-mybatis-plus-persistence.md)，任务锁见 [ADR-0003](0003-redisson-task-locks.md)。原始取舍保留在本记录，当前拓扑和能力见 [P0 实现架构](../p0/architecture.md)。
 
 ## 背景与决定
 
-保持 Java 21/Spring Boot 3.x、Python 3.12、Vue 3、PostgreSQL 基线。Java 是业务任务状态的唯一权威；Python 是执行快照、Agent 状态和 Checkpoint 的拥有者。HTTP JSON v1 + 拉取事件，不引入 Redis、Temporal 或消息中间件。
+保持 Java 21/Spring Boot 3.x、Python 3.12、Vue 3、PostgreSQL 基线。Java 是业务任务状态的唯一权威，Python 管理执行快照、Agent 状态和 Checkpoint。Java 通过 HTTP JSON v1 轮询事件。P0 未接入 Temporal 或消息中间件。初始实现未使用 Redis，后来通过 ADR-0003 引入 Redis 任务锁。
 
 DeepAgents 原生 Main Agent/tool loop/`task` 委派负责智能执行；其产物已经是 LangGraph 图，不再为“组合框架”额外套一层无意义的图。LangGraph SQLite Saver 保存 Main Agent 图状态。另建一个独立、明确的审批图，以 interrupt/Command(resume) 验证恢复语义。
 
@@ -17,7 +17,7 @@ DeepAgents 原生 Main Agent/tool loop/`task` 委派负责智能执行；其产�
 ## 存储与故障策略
 
 - PostgreSQL 保存 Task、单次 Run、事件；Flyway 管理迁移。
-- `FOR UPDATE SKIP LOCKED` 领取、数据库时间计算租约、fence 防旧结果覆盖；事务外调用 Runtime。
+- 初始实现通过 `FOR UPDATE SKIP LOCKED` 领取，现行策略见 ADR-0003。数据库时间计算租约，fence 防止旧结果覆盖，调用 Runtime 在事务外进行。
 - 失联的执行转 FAILED/WORKER_LOST（取消请求则 CANCELLED）；P0 不自动重试未知执行。人工核对后只能创建新的任务键。
 - Runtime 单实例拥有一个目录；每执行一个子进程，有限并发 4，超时/取消可以终止该进程。父进程死亡后子进程自检退出；目录锁防多实例误判恢复。
 - SQLite 分别保存 Runtime 去重/事件和 LangGraph Checkpoint；简单、可跨连接恢复，适合本地单 Runtime PoC。不能共享网络文件系统或据此承诺多 Runtime 高可用。Checkpoint 与业务数据库无分布式事务。
